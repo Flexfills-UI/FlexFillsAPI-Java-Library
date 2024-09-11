@@ -7,6 +7,8 @@ The `FlexfillsApi` is a package for using Flex Fills WebSocket communication wit
 ## Usage
 
 ```java
+import com.flexfills.app.FlexfillsApi;
+
 public class Main {
   public static void main(String[] args) throws Exception {
     FlexfillsApi flexfillsApi = new FlexfillsApi("username", "password", true);
