@@ -79,16 +79,9 @@ public class Main {
             <td>Private trades subscription will provide a snapshot of currently open ACTIVE orders and then updates via WebSocket.</td>
         </tr>
         <tr>
-            <td><code class="highlighter-rouge">getOpenOrdersList(Map<String, Object> orderData, List<String> instruments)</code></td>
+            <td><code class="highlighter-rouge">getOpenOrdersList(List<String> instruments)</code></td>
             <td>
-                <p><strong>orderData:</strong> The dict of order data, including globalInstrumentCd, clientOrderId, exchangeOrderId
-                <ul>
-                    <li>globalInstrumentCd - pair of currencies (BTC/USD, ...). string</li>
-                    <li>clientOrderId - Id of the order. string</li>
-                    <li>exchangeOrderId - exchangeOrderId. string</li>
-                </ul>
-                </p>
-                <p><strong>instruments:</strong> list of pair of currencies.</p>
+                <p><strong>instruments:</strong> list of pair of currencies. optional</p>
             </td>
             <td>Get current list of open orders. One time request/response.</td>
         </tr>

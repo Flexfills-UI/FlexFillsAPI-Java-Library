@@ -45,7 +45,7 @@ public class FlexfillsApi {
     // Define available constants
 
     private static final List<String> ORDER_DIRECTIONS = List.of("SELL", "BUY");
-    private static final List<String> ORDER_TYPES = List.of("MARKET", "LIMIT");
+    private static final List<String> ORDER_TYPES = List.of("MARKET", "LIMIT", "POST_ONLY");
     private static final List<String> TIME_IN_FORCES = List.of("GTC", "GTD", "GTT", "FOK", "IOC");
 
     // Define socket urls
@@ -132,7 +132,7 @@ public class FlexfillsApi {
         message.put("command", "GET");
         message.put("channel", CH_ASSET_LIST);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -142,7 +142,7 @@ public class FlexfillsApi {
         message.put("command", "GET");
         message.put("channel", CH_INSTRUMENT_LIST);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -157,7 +157,7 @@ public class FlexfillsApi {
                 Map.of("name", "instrument", "value", "[" + String.join(", ", instruments) + "]"));
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, callback).get();
+        Map<String, Object> resp = sendMessage(message, callback, false).get();
 
         return resp;
     }
@@ -172,7 +172,7 @@ public class FlexfillsApi {
                 Map.of("name", "instrument", "value", "[" + String.join(", ", instruments) + "]"));
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -191,7 +191,7 @@ public class FlexfillsApi {
 
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, callback).get();
+        Map<String, Object> resp = sendMessage(message, callback, false).get();
 
         return resp;
     }
@@ -200,7 +200,7 @@ public class FlexfillsApi {
         Map<String, Object> message = new HashMap<>();
         message.put("command", "SUBSCRIBE");
         message.put("channel", CH_PRV_BALANCE);
-        message.put("signature", "valid_signature");
+        message.put("signature", _authToken);
 
         List<Map<String, String>> channelArgs = new ArrayList<>();
         Map<String, String> instrumentArg = new HashMap<>();
@@ -210,7 +210,7 @@ public class FlexfillsApi {
 
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -220,7 +220,7 @@ public class FlexfillsApi {
         Map<String, Object> message = new HashMap<>();
         message.put("command", "SUBSCRIBE");
         message.put("channel", CH_PRV_TRADE_PRIVATE);
-        message.put("signature", "valid_signature");
+        message.put("signature", _authToken);
 
         List<Map<String, String>> channelArgs = new ArrayList<>();
         Map<String, String> instrumentArg = new HashMap<>();
@@ -230,12 +230,12 @@ public class FlexfillsApi {
 
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, callback).get();
+        Map<String, Object> resp = sendMessage(message, callback, false).get();
 
         return resp;
     }
 
-    public Map<String, Object> getOpenOrdersList(Map<String, Object> orderData, List<String> instruments)
+    public Map<String, Object> getOpenOrdersList(List<String> instruments)
             throws InterruptedException, ExecutionException {
         Map<String, Object> message = new HashMap<>();
         message.put("command", "GET");
@@ -248,24 +248,16 @@ public class FlexfillsApi {
         categoryArg.put("value", "ACTIVE_ORDERS");
         channelArgs.add(categoryArg);
 
-        Map<String, String> instrumentArg = new HashMap<>();
-        instrumentArg.put("name", "instrument");
-        instrumentArg.put("value", "[" + String.join(", ", instruments) + "]");
-        channelArgs.add(instrumentArg);
+        if (instruments != null && !instruments.isEmpty()) {
+            Map<String, String> instrumentArg = new HashMap<>();
+            instrumentArg.put("name", "instrument");
+            instrumentArg.put("value", "[" + String.join(", ", instruments) + "]");
+            channelArgs.add(instrumentArg);
+        }
 
         message.put("channelArgs", channelArgs);
 
-        List<Map<String, String>> data = new ArrayList<>();
-        Map<String, String> order = new HashMap<>();
-        order.put("class", "Order");
-        order.put("globalInstrumentCd", String.valueOf(orderData.get("globalInstrumentCd")));
-        order.put("clientOrderId", String.valueOf(orderData.get("clientOrderId")));
-        order.put("exchangeOrderId", String.valueOf(orderData.get("exchangeOrderId")));
-        data.add(order);
-
-        message.put("data", data);
-
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -304,12 +296,8 @@ public class FlexfillsApi {
         Map<String, Object> orderPayload = new HashMap<>();
         orderPayload.put("class", "Order");
         orderPayload.put("globalInstrumentCd", orderData.get("globalInstrumentCd").toString());
-        // orderPayload.put("clientOrderId", orderData.get("clientOrderId").toString());
         orderPayload.put("direction", orderData.get("direction").toString().toUpperCase());
         orderPayload.put("orderType", orderData.get("orderType").toString().toUpperCase());
-        // orderPayload.put("timeInForce",
-        // orderData.get("timeInForce").toString().toUpperCase());
-        // orderPayload.put("price", orderData.get("price").toString());
         orderPayload.put("amount", orderData.get("amount").toString());
 
         for (String okey : optionalKeys) {
@@ -330,25 +318,30 @@ public class FlexfillsApi {
     }
 
     public Map<String, Object> cancelOrder(Map<String, Object> orderData) throws Exception {
-        Map<String, String> orderPayload = new HashMap<>();
-        orderPayload.put("class", "Order");
-        orderPayload.put("globalInstrumentCd", String.valueOf(orderData.get("globalInstrumentCd")));
 
-        if (orderData.containsKey("orderId")) {
-            orderPayload.put("orderId", String.valueOf(orderData.get("orderId")));
-        } else if (orderData.containsKey("exchangeOrderId")) {
-            orderPayload.put("exchangeOrderId", String.valueOf(orderData.get("exchangeOrderId")));
-        } else {
-            throw new Exception("orderId or exchangeOrderId is missing.");
-        }
+        List<String> requiredKeys = List.of("globalInstrumentCd", "clientOrderId", "direction",
+                "orderType", "timeInForce", "price", "amount", "exchange");
+
+        Map<String, Object> validData = validatePayload(orderData, requiredKeys, List.of(), "orderData");
+
+        validData.put("class", "Order");
+
+        Map<String, Object> subscribeMessage = new HashMap<>();
+        subscribeMessage.put("command", "SUBSCRIBE");
+        subscribeMessage.put("signature", _authToken);
+        subscribeMessage.put("channel", CH_PRV_TRADE_PRIVATE);
+
+        List<Map<String, String>> channelArgs = List.of(
+                Map.of("name", "instrument", "value", "[" + orderData.get("globalInstrumentCd").toString() + "]"));
+        subscribeMessage.put("channelArgs", channelArgs);
 
         Map<String, Object> message = new HashMap<>();
         message.put("command", "CANCEL");
-        message.put("signature", "valid_signature");
+        message.put("signature", _authToken);
         message.put("channel", CH_PRV_TRADE_PRIVATE);
-        message.put("data", new Map[] { orderPayload });
+        message.put("data", new Map[] { validData });
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = subscribeAndSendMessage(subscribeMessage, message, null).get();
 
         return resp;
     }
@@ -357,7 +350,7 @@ public class FlexfillsApi {
             throws InterruptedException, ExecutionException {
         Map<String, Object> message = new HashMap<>();
         message.put("command", "MODIFY");
-        message.put("signature", "valid_signature");
+        message.put("signature", _authToken);
         message.put("channel", CH_PRV_TRADE_PRIVATE);
 
         Map<String, Object> orderDetails = new HashMap<>();
@@ -376,7 +369,7 @@ public class FlexfillsApi {
 
         message.put("data", new Map[] { orderDetails });
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -385,7 +378,7 @@ public class FlexfillsApi {
             throws InterruptedException, ExecutionException {
         Map<String, Object> message = new HashMap<>();
         message.put("command", "GET");
-        message.put("signature", "valid_signature");
+        message.put("signature", _authToken);
         message.put("channel", CH_PRV_TRADE_PRIVATE);
 
         List<Map<String, String>> channelArgs = new ArrayList<>();
@@ -396,7 +389,7 @@ public class FlexfillsApi {
 
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -405,7 +398,7 @@ public class FlexfillsApi {
             List<String> statues) throws InterruptedException, ExecutionException {
         Map<String, Object> message = new HashMap<>();
         message.put("command", "GET");
-        message.put("signature", "valid_signature");
+        message.put("signature", _authToken);
         message.put("channel", CH_PRV_TRADE_PRIVATE);
 
         List<Map<String, String>> channelArgs = List.of(
@@ -417,7 +410,7 @@ public class FlexfillsApi {
 
         message.put("channelArgs", channelArgs);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -427,7 +420,7 @@ public class FlexfillsApi {
         message.put("command", "GET");
         message.put("channel", CH_PRV_TRADE_POSITIONS);
 
-        Map<String, Object> resp = sendMessage(message, null).get();
+        Map<String, Object> resp = sendMessage(message, null, false).get();
 
         return resp;
     }
@@ -444,7 +437,7 @@ public class FlexfillsApi {
     }
 
     protected CompletableFuture<Map<String, Object>> sendMessage(Map<String, Object> message,
-            Callable<Map<String, Object>> callback) {
+            Callable<Map<String, Object>> callback, boolean isOneTime) {
 
         CompletableFuture<Map<String, Object>> futureResponse = new CompletableFuture<>();
         HttpClient client = HttpClient.newHttpClient();
@@ -455,6 +448,7 @@ public class FlexfillsApi {
                 .buildAsync(URI.create(_socketUrl), new Listener() {
                     private int count = 0;
                     private Map<String, Object> jsonResponseMap = new HashMap<>();
+                    private StringBuilder messageBuffer = new StringBuilder();
 
                     @Override
                     public void onOpen(WebSocket webSocket) {
@@ -469,33 +463,40 @@ public class FlexfillsApi {
 
                     @Override
                     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                        String response = data.toString();
-                        boolean isValid;
-                        try {
-                            JsonNode jsonResponse = objectMapper.readTree(response);
-                            jsonResponseMap = objectMapper.convertValue(jsonResponse,
-                                    new TypeReference<Map<String, Object>>() {
-                                    });
+                        messageBuffer.append(data);
 
-                            isValid = validateResponse(jsonResponse, message);
-                            // validatedResp = jsonResponse.toString();
-                        } catch (Exception e) {
-                            futureResponse.completeExceptionally(e);
-                            return Listener.super.onText(webSocket, data, last);
-                        }
+                        if (last) {
+                            boolean isValid;
+                            String response = messageBuffer.toString();
+                            messageBuffer.setLength(0); // Clear the buffer
 
-                        if (callback != null) {
-                            callback.call(jsonResponseMap);
-                        } else {
-                            if (isValid) {
-                                futureResponse.complete(jsonResponseMap);
-                                webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Done");
-                            } else if (count >= 10) {
-                                futureResponse.completeExceptionally(new RuntimeException("Validation failed"));
-                                webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Done");
+                            try {
+                                JsonNode jsonResponse = objectMapper.readTree(response);
+                                jsonResponseMap = objectMapper.convertValue(jsonResponse,
+                                        new TypeReference<Map<String, Object>>() {
+                                        });
+
+                                isValid = validateResponse(jsonResponse, message);
+                                // validatedResp = jsonResponse.toString();
+                            } catch (Exception e) {
+                                futureResponse.completeExceptionally(e);
+                                return Listener.super.onText(webSocket, data, last);
                             }
-                            count++;
+
+                            if (callback != null) {
+                                callback.call(jsonResponseMap);
+                            } else {
+                                if (isOneTime || isValid) {
+                                    futureResponse.complete(jsonResponseMap);
+                                    webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Done");
+                                } else if (count >= 10) {
+                                    futureResponse.completeExceptionally(new RuntimeException("Validation failed"));
+                                    webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Done");
+                                }
+                                count++;
+                            }
                         }
+
                         return Listener.super.onText(webSocket, data, last);
                     }
 
@@ -627,14 +628,21 @@ public class FlexfillsApi {
         return true;
     }
 
-    public static boolean validatePayload(Map<String, Object> payload, List<String> requiredKeys,
+    public static Map<String, Object> validatePayload(Map<String, Object> payload, List<String> requiredKeys,
             List<String> optionalKeys,
             String dataType) throws Exception {
-        boolean isValid = true;
+
+        Map<String, Object> validData = new HashMap<>();
 
         if (requiredKeys != null) {
             for (String key : requiredKeys) {
-                if (!payload.containsKey(key)) {
+                if (payload.containsKey(key)) {
+                    if (payload.get(key) == null) {
+                        validData.put(key, null);
+                    } else {
+                        validData.put(key, payload.get(key).toString());
+                    }
+                } else {
                     throw new Exception(key + " field should be in the "
                             + (dataType != null && !dataType.isEmpty() ? dataType : "payload data"));
                 }
@@ -643,18 +651,17 @@ public class FlexfillsApi {
 
         if (optionalKeys != null) {
             for (String key : optionalKeys) {
-                isValid = isValid && payload.containsKey(key);
+                if (payload.containsKey(key)) {
+                    validData.put(key, payload.get(key).toString());
+                }
             }
-        }
-
-        if (!isValid) {
-            throw new Exception(
-                    "The " + (dataType != null && !dataType.isEmpty() ? dataType : "payload data") + " is not valid");
         }
 
         if (payload.containsKey("direction")) {
             String direction = payload.get("direction").toString().toUpperCase();
-            if (!ORDER_DIRECTIONS.contains(direction)) {
+            if (ORDER_DIRECTIONS.contains(direction)) {
+                validData.put("direction", direction);
+            } else {
                 throw new Exception("The direction field is not valid in "
                         + (dataType != null && !dataType.isEmpty() ? dataType : "payload data"));
             }
@@ -662,20 +669,28 @@ public class FlexfillsApi {
 
         if (payload.containsKey("orderType")) {
             String orderType = payload.get("orderType").toString().toUpperCase();
-            if (!ORDER_TYPES.contains(orderType)) {
+            if (ORDER_TYPES.contains(orderType)) {
+                validData.put("orderType", orderType);
+            } else {
                 throw new Exception("The orderType field is not valid in "
                         + (dataType != null && !dataType.isEmpty() ? dataType : "payload data"));
             }
         }
 
         if (payload.containsKey("timeInForce")) {
-            String timeInForce = payload.get("timeInForce").toString().toUpperCase();
-            if (!TIME_IN_FORCES.contains(timeInForce)) {
-                throw new Exception("The timeInForce field is not valid in "
-                        + (dataType != null && !dataType.isEmpty() ? dataType : "payload data"));
+            if (payload.get("timeInForce") == null) {
+                validData.put("timeInForce", "GTC");
+            } else {
+                String timeInForce = payload.get("timeInForce").toString().toUpperCase();
+                if (TIME_IN_FORCES.contains(timeInForce)) {
+                    validData.put("timeInForce", timeInForce);
+                } else {
+                    throw new Exception("The timeInForce field is not valid in "
+                            + (dataType != null && !dataType.isEmpty() ? dataType : "payload data"));
+                }
             }
         }
 
-        return isValid;
+        return validData;
     }
 }
