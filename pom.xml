@@ -4,7 +4,7 @@
   <groupId>com.flexfills.app</groupId>
   <artifactId>flexfills-api</artifactId>
   <packaging>jar</packaging>
-  <version>0.0.2</version>
+  <version>0.0.3</version>
   <name>flexfills-api</name>
   <description>This package is for using Flex Fills WebSocket communication with FlexFills trading services.</description>
   <url>https://github.com/Flexfills-UI/FlexFillsAPI-Java-Library</url>

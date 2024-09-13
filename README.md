@@ -104,7 +104,7 @@ public class Main {
                     </li>
                     <li>price: optional, Price only required for limit orders</li>
                     <li>amount: Quantity of the order</li>
-                    <li>exchangeName: Name of exchange to send order to, string, optional. required for direct orders</li>
+                    <li>exchange: Name of exchange to send order to, string, required</li>
                     <li>orderSubType: optional, string, POST_ONLY, only required if client wishes to submit a passive order which does not immediately fill the order, in case of immediate fill, order will be rejected</li>
                     <li>tradeSide: optional, string, Side of the order Enum buy or sell</li>
                 </ul>

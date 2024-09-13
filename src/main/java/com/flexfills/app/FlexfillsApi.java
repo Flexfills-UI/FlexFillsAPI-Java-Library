@@ -26,7 +26,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
  */
 public class FlexfillsApi {
     // Define Auth Urls
-
     private static final String BASE_DOMAIN_TEST = "test.flexfills.com";
     private static final String BASE_DOMAIN_PROD = "flexfills.com";
 
@@ -264,15 +263,17 @@ public class FlexfillsApi {
 
     public Map<String, Object> createOrder(Map<String, Object> orderData)
             throws Exception {
-        List<String> requiredKeys = List.of("globalInstrumentCd", "direction",
+        List<String> requiredKeys = List.of("globalInstrumentCd", "exchange", "direction",
                 "orderType", "amount");
 
         List<String> optionalKeys = List.of("exchangeName", "orderSubType", "price", "clientOrderId",
                 "timeInForce", "tradeSide");
 
-        validatePayload(orderData, requiredKeys, List.of(), "orderData");
+        Map<String, Object> validData = validatePayload(orderData, requiredKeys, optionalKeys, "orderData");
 
-        if (orderData.get("orderType").toString().toUpperCase() == "LIMIT" && !orderData.containsKey("price")) {
+        validData.put("class", "Order");
+
+        if (validData.get("orderType") == "LIMIT" && !validData.containsKey("price")) {
             throw new Exception("Price should be included in orderData.");
         }
 
@@ -293,24 +294,11 @@ public class FlexfillsApi {
                 Map.of("name", "instrument", "value", "[" + orderData.get("globalInstrumentCd").toString() + "]"));
         subscribeMessage.put("channelArgs", channelArgs);
 
-        Map<String, Object> orderPayload = new HashMap<>();
-        orderPayload.put("class", "Order");
-        orderPayload.put("globalInstrumentCd", orderData.get("globalInstrumentCd").toString());
-        orderPayload.put("direction", orderData.get("direction").toString().toUpperCase());
-        orderPayload.put("orderType", orderData.get("orderType").toString().toUpperCase());
-        orderPayload.put("amount", orderData.get("amount").toString());
-
-        for (String okey : optionalKeys) {
-            if (orderData.containsKey(okey)) {
-                orderPayload.put(okey, String.valueOf(orderData.get(okey)));
-            }
-        }
-
         Map<String, Object> message = new HashMap<>();
         message.put("command", "CREATE");
         message.put("signature", _authToken);
         message.put("channel", CH_PRV_TRADE_PRIVATE);
-        message.put("data", List.of(orderPayload));
+        message.put("data", List.of(validData));
 
         Map<String, Object> resp = subscribeAndSendMessage(subscribeMessage, message, null).get();
 
@@ -537,14 +525,14 @@ public class FlexfillsApi {
                     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
                         String response = data.toString();
                         JsonNode jsonResponse;
-
                         try {
                             jsonResponse = objectMapper.readTree(response);
                             // isValid = validateResponse(jsonResponse, subscriber);
                             jsonResponseMap = objectMapper.convertValue(jsonResponse,
                                     new TypeReference<Map<String, Object>>() {
                                     });
-                            if (jsonResponse.has("event") && jsonResponse.get("event").asText().equals("ERROR")) {
+                            if (!jsonResponse.has("event") || (jsonResponse.has("event")
+                                    && jsonResponse.get("event").asText().equals("ERROR"))) {
                                 futureResponse.complete(jsonResponseMap);
                                 webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "Done");
                                 return Listener.super.onText(webSocket, data, last);
